@@ -1,0 +1,15 @@
+<svg width="100%" height="160" viewBox="0 0 1200 160" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#43e97b"/>
+      <stop offset="100%" stop-color="#38f9d7"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="160" fill="url(#grad)" rx="16"/>
+  <text x="50%" y="55%" text-anchor="middle" font-size="42" fill="white" font-family="Arial">
+    📐 Inversion Function Generator
+  </text>
+  <text x="50%" y="80%" text-anchor="middle" font-size="18" fill="white" opacity="0.9" font-family="Arial">
+    Java 8 • Swing UI • Numerical Methods
+  </text>
+</svg>
