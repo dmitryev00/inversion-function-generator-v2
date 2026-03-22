@@ -1,4 +1,4 @@
-package models;
+package org.dmitryev00.function.models;
 
 public class Point implements Comparable<Point>{
 	private final double x;

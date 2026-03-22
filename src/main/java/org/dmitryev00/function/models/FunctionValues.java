@@ -1,4 +1,4 @@
-package models;
+package org.dmitryev00.function.models;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -6,7 +6,7 @@ import java.util.List;
 
 public class FunctionValues {
 
-	private List<Point> points;
+	private final List<Point> points;
 
 	public FunctionValues() {
 		this.points = new ArrayList<>();

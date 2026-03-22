@@ -1,7 +1,7 @@
-package services;
+package org.dmitryev00.math;
 
-import models.FunctionValues;
-import models.Point;
+import org.dmitryev00.function.models.FunctionValues;
+import org.dmitryev00.function.models.Point;
 
 import java.util.List;
 import java.util.Optional;

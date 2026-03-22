@@ -1,8 +1,11 @@
-package ui;
+package org.dmitryev00.ui;
 
-import controller.AppController;
-import models.FunctionValues;
-import models.GeneratedNumbers;
+import org.dmitryev00.controller.Controller;
+import org.dmitryev00.function.models.FunctionValues;
+import org.dmitryev00.function.models.ModeledNumbers;
+import org.dmitryev00.function.models.Function;
+import org.dmitryev00.math.statistic.*;
+
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
@@ -16,14 +19,16 @@ import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
+import java.util.Objects;
+import java.util.Map;
 
 public class App {
 	private JFrame mainFrame;
-	private AppController controller;
+	private Controller controller;
 
-	// Поля ввода
 	private JTextField cdfField;
 	private JTextField pdfField;
 	private JTextField inverseField;
@@ -31,15 +36,25 @@ public class App {
 	private JTextField toField;
 	private JTextField stepField;
 	private JTextField amountField;
+	private JTextField binsField;
 
-	// График
+	private JComboBox<String> strategySpinner;
+	private JButton analyzeButton;
+
 	private ChartPanel chartPanel;
+	private JTable dataTable;
+	private DefaultTableModel tableModel;
 
-	// Статус
 	private boolean distributionBuilt = false;
+	private ModeledNumbers lastSample;
+
+	private StrategyManager strategyManager;
 
 	public App() {
-		controller = new AppController();
+		controller = new Controller();
+		strategyManager = new StrategyManager();
+		strategyManager.addStrategy(new ChiSquare(10));
+		strategyManager.addStrategy(new KolmogorovCriteria());
 		initUI();
 	}
 
@@ -48,16 +63,22 @@ public class App {
 		mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		mainFrame.setLayout(new BorderLayout(10, 10));
 
-		// Панель ввода
 		mainFrame.add(createInputPanel(), BorderLayout.NORTH);
 
-		// График
+		JPanel centerPanel = new JPanel(new BorderLayout());
 		chartPanel = new ChartPanel(null);
-		chartPanel.setPreferredSize(new Dimension(800, 500));
+		chartPanel.setPreferredSize(new Dimension(800, 400));
 		chartPanel.setBackground(Color.WHITE);
-		mainFrame.add(chartPanel, BorderLayout.CENTER);
+		centerPanel.add(chartPanel, BorderLayout.CENTER);
 
-		// Статус бар
+		// Добавляем DataGrid под графиком
+		tableModel = new DefaultTableModel(new Object[]{"Индекс", "Значение"}, 0);
+		dataTable = new JTable(tableModel);
+		JScrollPane scrollPane = new JScrollPane(dataTable);
+		scrollPane.setPreferredSize(new Dimension(800, 150));
+		centerPanel.add(scrollPane, BorderLayout.SOUTH);
+
+		mainFrame.add(centerPanel, BorderLayout.CENTER);
 		mainFrame.add(createStatusBar(), BorderLayout.SOUTH);
 
 		mainFrame.pack();
@@ -66,10 +87,9 @@ public class App {
 	}
 
 	private JPanel createInputPanel() {
-		JPanel panel = new JPanel(new GridLayout(4, 4, 5, 5));
+		JPanel panel = new JPanel(new GridLayout(6, 4, 5, 5));
 		panel.setBorder(BorderFactory.createTitledBorder("Параметры распределения"));
 
-		// CDF
 		panel.add(new JLabel("CDF (F(x)):"));
 		cdfField = new JTextField("x");
 		panel.add(cdfField);
@@ -78,7 +98,6 @@ public class App {
 		fromField = new JTextField("0");
 		panel.add(fromField);
 
-		// PDF
 		panel.add(new JLabel("PDF (f(x)):"));
 		pdfField = new JTextField("");
 		pdfField.setToolTipText("Оставьте пустым для автоматического расчета");
@@ -88,7 +107,6 @@ public class App {
 		toField = new JTextField("1");
 		panel.add(toField);
 
-		// Inverse
 		panel.add(new JLabel("Inverse (F⁻¹(x)):"));
 		inverseField = new JTextField("");
 		inverseField.setToolTipText("Оставьте пустым для автоматического расчета");
@@ -98,7 +116,11 @@ public class App {
 		stepField = new JTextField("0.01");
 		panel.add(stepField);
 
-		// Кнопки
+		panel.add(new JLabel("Интервалы"));
+		binsField = new JTextField("");
+		panel.add(binsField);
+
+		panel.add(new JLabel(""));
 		JButton buildButton = new JButton("Построить распределение");
 		buildButton.addActionListener(e -> buildDistribution());
 		panel.add(buildButton);
@@ -107,9 +129,18 @@ public class App {
 		amountField = new JTextField("1000");
 		panel.add(amountField);
 
+		panel.add(new JLabel(""));
 		JButton generateButton = new JButton("Сгенерировать выборку");
 		generateButton.addActionListener(e -> generateSample());
 		panel.add(generateButton);
+
+		panel.add(new JLabel("Стратегия анализа:"));
+		strategySpinner = new JComboBox<>(new String[]{"Хи-квадрат", "Критерий Колмогорова", "Все"});
+		panel.add(strategySpinner);
+
+		analyzeButton = new JButton("Проанализировать модель");
+		analyzeButton.addActionListener(e -> analyzeSample());
+		panel.add(analyzeButton);
 
 		return panel;
 	}
@@ -142,19 +173,9 @@ public class App {
 					"Успех",
 					JOptionPane.INFORMATION_MESSAGE);
 
-		} catch (NumberFormatException e) {
-			JOptionPane.showMessageDialog(mainFrame,
-					"Ошибка в числовых полях: " + e.getMessage(),
-					"Ошибка",
-					JOptionPane.ERROR_MESSAGE);
-		} catch (IllegalArgumentException e) {
-			JOptionPane.showMessageDialog(mainFrame,
-					e.getMessage(),
-					"Ошибка",
-					JOptionPane.ERROR_MESSAGE);
 		} catch (Exception e) {
 			JOptionPane.showMessageDialog(mainFrame,
-					"Неожиданная ошибка: " + e.getMessage(),
+					"Ошибка построения: " + e.getMessage(),
 					"Ошибка",
 					JOptionPane.ERROR_MESSAGE);
 			e.printStackTrace();
@@ -172,18 +193,15 @@ public class App {
 
 		try {
 			int amount = Integer.parseInt(amountField.getText());
-			if (amount <= 0) {
-				throw new IllegalArgumentException("Количество должно быть > 0");
-			}
-
-			GeneratedNumbers numbers = controller.generateSample(amount);
-			plotHistogram(numbers);
+			lastSample = controller.generateSample(amount);
+			plotHistogram(lastSample);
+			fillDataTable(lastSample);
 
 			JOptionPane.showMessageDialog(mainFrame,
 					"Сгенерировано " + amount + " чисел\n" +
-							"Минимум: " + String.format("%.3f", numbers.getMin()) + "\n" +
-							"Максимум: " + String.format("%.3f", numbers.getMax()) + "\n" +
-							"Среднее: " + String.format("%.3f", numbers.getMean()),
+							"Минимум: " + String.format("%.3f", lastSample.getMin()) + "\n" +
+							"Максимум: " + String.format("%.3f", lastSample.getMax()) + "\n" +
+							"Среднее: " + String.format("%.3f", lastSample.getMean()),
 					"Результат",
 					JOptionPane.INFORMATION_MESSAGE);
 
@@ -196,20 +214,57 @@ public class App {
 		}
 	}
 
-	private void plotHistogram(GeneratedNumbers numbers) {
-		if (numbers == null || numbers.isEmpty()) {
+	private void fillDataTable(ModeledNumbers sample) {
+		tableModel.setRowCount(0);
+		List<Double> numbers = sample.getNumbers();
+		for (int i = 0; i < numbers.size(); i++) {
+			tableModel.addRow(new Object[]{i + 1, numbers.get(i)});
+		}
+	}
+
+	private void analyzeSample() {
+		if (lastSample == null || lastSample.isEmpty()) {
+			JOptionPane.showMessageDialog(mainFrame,
+					"Сначала сгенерируйте выборку!",
+					"Ошибка",
+					JOptionPane.ERROR_MESSAGE);
 			return;
 		}
+
+		String selectedStrategy = (String) strategySpinner.getSelectedItem();
+		Function cdfFunction = new Function(cdfField.getText().trim(),
+				Double.parseDouble(fromField.getText()),
+				Double.parseDouble(toField.getText()),
+				Double.parseDouble(stepField.getText()));
+
+		StringBuilder result = new StringBuilder();
+		if ("Все".equals(selectedStrategy)) {
+			Map<String, Double> results = strategyManager.evaluateAll(lastSample, cdfFunction);
+			for (String name : results.keySet()) {
+				result.append(name).append(": ").append(results.get(name)).append("\n");
+			}
+		} else {
+			double value = strategyManager.evaluate(selectedStrategy, lastSample, cdfFunction);
+			result.append(selectedStrategy).append(": ").append(value);
+		}
+
+		JOptionPane.showMessageDialog(mainFrame,
+				result.toString(),
+				"Результаты анализа",
+				JOptionPane.INFORMATION_MESSAGE);
+	}
+
+	private void plotHistogram(ModeledNumbers numbers) {
+		if (numbers == null || numbers.isEmpty()) return;
 
 		List<Double> values = numbers.getNumbers();
 		double[] data = values.stream().mapToDouble(Double::doubleValue).toArray();
 
-		// Гистограмма
 		HistogramDataset histogramDataset = new HistogramDataset();
-		//histogramDataset.setType(HistogramType.SCALE_AREA_TO_1);
+		histogramDataset.setType(HistogramType.SCALE_AREA_TO_1);
 
-		int bins = Math.min(50, values.size() / 10);
-		bins = Math.max(10, bins);
+		int bins = Objects.equals(binsField.getText(), "") ? Math.min(50, values.size() / 10)
+				: Integer.parseInt(binsField.getText());
 
 		histogramDataset.addSeries("Выборка", data, bins);
 
@@ -226,14 +281,12 @@ public class App {
 
 		XYPlot plot = chart.getXYPlot();
 
-		// Настройка гистограммы
 		XYBarRenderer barRenderer = (XYBarRenderer) plot.getRenderer();
-		barRenderer.setSeriesPaint(0, new Color(70, 130, 180, 150));
+		barRenderer.setSeriesPaint(0, new Color(28, 133, 218, 150));
 		barRenderer.setDrawBarOutline(true);
 		barRenderer.setSeriesOutlinePaint(0, Color.BLUE);
 		barRenderer.setMargin(0.1);
 
-		// Добавление теоретической PDF если есть
 		FunctionValues pdfValues = controller.getPDFValues();
 		if (pdfValues != null && !pdfValues.isEmpty()) {
 			XYSeries pdfSeries = createPDFSeries(pdfValues, values);
@@ -248,7 +301,6 @@ public class App {
 			plot.setRenderer(1, lineRenderer);
 		}
 
-		// Настройка внешнего вида
 		plot.setBackgroundPaint(Color.WHITE);
 		plot.setDomainGridlinePaint(Color.LIGHT_GRAY);
 		plot.setRangeGridlinePaint(Color.LIGHT_GRAY);
@@ -260,11 +312,9 @@ public class App {
 	private XYSeries createPDFSeries(FunctionValues pdfValues, List<Double> sample) {
 		XYSeries series = new XYSeries("Теоретическая PDF");
 
-		// Определяем диапазон по выборке
 		double minX = sample.stream().min(Double::compare).orElse(0.0);
 		double maxX = sample.stream().max(Double::compare).orElse(1.0);
 		double margin = (maxX - minX) * 0.1;
-
 		minX -= margin;
 		maxX += margin;
 
@@ -277,7 +327,6 @@ public class App {
 				series.add(x, yValues.get(i));
 			}
 		}
-
 		return series;
 	}
 

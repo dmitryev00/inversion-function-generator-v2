@@ -1,8 +1,8 @@
-package services;
+package org.dmitryev00.function;
 
-import models.Function;
-import models.FunctionValues;
-import models.Point;
+import org.dmitryev00.function.models.Function;
+import org.dmitryev00.function.models.FunctionValues;
+import org.dmitryev00.function.models.Point;
 import net.objecthunter.exp4j.Expression;
 import net.objecthunter.exp4j.ExpressionBuilder;
 
@@ -25,7 +25,6 @@ public class FunctionService {
 					.build();
 			return e.setVariable("x", x).evaluate();
 		} catch (ArithmeticException e) {
-			// Ловим деление на ноль
 			System.err.println("Ошибка вычисления: " + e.getMessage());
 			System.err.println("Функция: " + function + ", x=" + x);
 

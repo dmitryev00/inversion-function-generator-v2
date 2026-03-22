@@ -1,28 +1,31 @@
-package services;
+package org.dmitryev00.modeler.inversion;
 
-import models.FunctionValues;
-import models.GeneratedNumbers;
+import org.dmitryev00.function.models.FunctionValues;
+import org.dmitryev00.function.models.ModeledNumbers;
+import org.dmitryev00.math.InterpolationService;
+import org.dmitryev00.modeler.Sampler;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
-public class GeneratorService {
+public class InversionSampler implements Sampler {
 
 	private final FunctionValues inversionFunctionValues;
 	private final InterpolationService interpolationService;
 	private final Random random;
 
-	public GeneratorService(FunctionValues inversionFunctionValues, InterpolationService interpolationService){
+	public InversionSampler(FunctionValues inversionFunctionValues, InterpolationService interpolationService){
 		this.inversionFunctionValues = inversionFunctionValues;
 		this.interpolationService = interpolationService;
 		this.random = new Random();
 	}
 
-	public GeneratedNumbers generateNumbers(int amount)
+	@Override
+	public ModeledNumbers sample(int amount)
 	{
-		List<Double> numbers = new ArrayList<Double>();
+		List<Double> numbers = new ArrayList<>();
 		for(int i = 0; i < amount; i++)
 		{
 			double number = random.nextDouble();
@@ -33,6 +36,6 @@ public class GeneratorService {
 				i--;
 			}
 		}
-		return new GeneratedNumbers(numbers);
+		return new ModeledNumbers(numbers);
 	}
 }
